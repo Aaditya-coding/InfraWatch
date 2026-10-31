@@ -12,7 +12,10 @@ class AnomalyDetector:
         "memory_usage": 85,
         "disk_usage": 90,
         "network_usage": 900,
-        "temperature": 80
+        "temperature": 80,
+        "vibration": 4.5,
+        "power": 10.5,
+        "pressure": 5.5
     }
 
     def __init__(self, thresholds=None):
@@ -134,6 +137,21 @@ class AnomalyDetector:
             self.detect(reading)
             for reading in readings
         ]
+
+
+_default_detector = None
+
+
+def detect_anomalies(reading, thresholds=None):
+    """
+    Convenience function to analyze a sensor reading using AnomalyDetector.
+    """
+    global _default_detector
+    if thresholds is not None:
+        return AnomalyDetector(thresholds).detect(reading)
+    if _default_detector is None:
+        _default_detector = AnomalyDetector()
+    return _default_detector.detect(reading)
 
 
 if __name__ == "__main__":

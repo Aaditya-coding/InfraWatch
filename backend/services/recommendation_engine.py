@@ -37,6 +37,24 @@ class RecommendationEngine:
             "MEDIUM": "Monitor server temperature and verify cooling system performance.",
             "HIGH": "Inspect cooling fans, ventilation, and airflow.",
             "CRITICAL": "Reduce system load and immediately inspect cooling equipment to prevent overheating."
+        },
+
+        "vibration": {
+            "MEDIUM": "Inspect mechanical alignment and monitor bearing vibration signatures.",
+            "HIGH": "Re-lubricate bearing assembly and schedule acoustic vibration spectral analysis.",
+            "CRITICAL": "Emergency shutdown: excessive vibration indicates severe bearing spalling or impeller unbalance."
+        },
+
+        "pressure": {
+            "MEDIUM": "Verify suction line valve clearance and filter mesh.",
+            "HIGH": "Inspect suction strainer for debris and adjust inlet throttling to prevent cavitation.",
+            "CRITICAL": "Halt pump to prevent permanent impeller volute damage from severe hydraulic cavitation."
+        },
+
+        "power": {
+            "MEDIUM": "Monitor electrical phase balance and motor active load.",
+            "HIGH": "Inspect motor windings and check for excessive mechanical drag.",
+            "CRITICAL": "Trip motor circuit breaker immediately to prevent stator burnout from overload."
         }
     }
 
@@ -183,6 +201,25 @@ class RecommendationEngine:
             risk_level,
             "Risk level unavailable. Review infrastructure metrics."
         )
+
+
+_default_recommendation_engine = None
+
+
+def generate_recommendations(detection_result, risk_result=None):
+    """
+    Convenience function to generate prescriptive maintenance recommendations.
+    Accepts (detection_result, risk_result) or handles single-argument usage.
+    """
+    global _default_recommendation_engine
+    if _default_recommendation_engine is None:
+        _default_recommendation_engine = RecommendationEngine()
+
+    if isinstance(detection_result, dict) and "risk_score" in detection_result and "anomalies" not in detection_result:
+        # User passed risk_result as the only argument
+        return _default_recommendation_engine.generate_recommendations({"anomalies": []}, detection_result)
+
+    return _default_recommendation_engine.generate_recommendations(detection_result, risk_result)
 
 
 if __name__ == "__main__":

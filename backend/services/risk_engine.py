@@ -141,6 +141,21 @@ class RiskEngine:
         )
 
 
+_default_risk_engine = None
+
+
+def calculate_risk(detection_result, max_score=100):
+    """
+    Convenience function to evaluate infrastructure risk using RiskEngine.
+    """
+    global _default_risk_engine
+    if max_score != 100:
+        return RiskEngine(max_score=max_score).calculate_risk(detection_result)
+    if _default_risk_engine is None:
+        _default_risk_engine = RiskEngine()
+    return _default_risk_engine.calculate_risk(detection_result)
+
+
 if __name__ == "__main__":
 
     engine = RiskEngine()

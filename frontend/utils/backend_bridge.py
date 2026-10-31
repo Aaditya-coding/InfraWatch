@@ -244,21 +244,48 @@ _simulator = FallbackSimulator()
 
 
 def get_latest_telemetry(scenario="Normal Operation", inject_spike=False, rpm=2950, throttle=100, ambient_temp=28.0, sensitivity_z=2.5):
-    """Standard interface function used by Om's Streamlit frontend."""
+    """Standard interface function connecting Om's Streamlit frontend with Aditya's backend ML pipeline."""
+    point = _simulator.generate_point(
+        scenario=scenario,
+        inject_spike=inject_spike,
+        rpm=rpm,
+        throttle=throttle,
+        ambient_temp=ambient_temp,
+        sensitivity_z=sensitivity_z
+    )
+
     if BACKEND_AVAILABLE:
         try:
-            data_point = generate_sensor_stream(scenario=scenario)
-            anomaly_info = detect_anomalies(data_point)
+            # 1. Feed real-time telemetry into Aditya's AnomalyDetector
+            anomaly_payload = {
+                "temperature": point["temperature"],
+                "vibration": point["vibration"],
+                "pressure": point["pressure"],
+                "power": point["power"]
+            }
+            anomaly_info = detect_anomalies(anomaly_payload)
+
+            # 2. Feed detected anomalies into Aditya's RiskEngine
             risk_info = calculate_risk(anomaly_info)
-            recommendations = generate_recommendations(risk_info)
-            data_point.update(anomaly_info)
-            data_point.update(risk_info)
-            data_point.update(recommendations)
-            return data_point
+
+            # 3. Feed risk and anomalies into Aditya's RecommendationEngine
+            rec_info = generate_recommendations(anomaly_info, risk_info)
+
+            # Update telemetry flags and prescriptive actions if anomalies detected
+            if anomaly_info.get("is_anomaly"):
+                point["anomaly"] = True
+
+            # If backend generated prescriptive recommendations, enrich root cause & action
+            recs = rec_info.get("recommendations", [])
+            urgent_recs = [r for r in recs if r.get("priority") in ["URGENT", "HIGH"]]
+            if urgent_recs:
+                point["recommendation"] = urgent_recs[0]["recommendation"]
+                anom_metrics = [a["metric"] for a in anomaly_info.get("anomalies", [])]
+                point["root_cause"] = f"Backend ML detected {risk_info.get('anomaly_count')} anomaly signals ({', '.join(anom_metrics)}). {point['root_cause']}"
         except Exception:
-            return _simulator.generate_point(scenario, inject_spike, rpm, throttle, ambient_temp, sensitivity_z)
-    else:
-        return _simulator.generate_point(scenario, inject_spike, rpm, throttle, ambient_temp, sensitivity_z)
+            pass
+
+    return point
 
 
 def get_initial_history(count=50, scenario="Normal Operation", rpm=2950, throttle=100, ambient_temp=28.0, sensitivity_z=2.5):

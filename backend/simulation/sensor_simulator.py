@@ -58,6 +58,22 @@ class SensorSimulator:
             time.sleep(interval)
 
 
+_default_simulator = None
+
+
+def generate_sensor_stream(scenario="Normal Operation", seed=None):
+    """
+    Generate a single reading from the sensor simulator stream.
+    """
+    global _default_simulator
+    if _default_simulator is None or seed is not None:
+        _default_simulator = SensorSimulator(seed=seed)
+
+    if scenario and scenario != "Normal Operation":
+        return _default_simulator.generate_anomalous_reading()
+    return _default_simulator.generate_reading()
+
+
 if __name__ == "__main__":
     simulator = SensorSimulator()
 
@@ -66,3 +82,4 @@ if __name__ == "__main__":
 
     for reading in simulator.generate_multiple_readings(5):
         print(reading)
+
