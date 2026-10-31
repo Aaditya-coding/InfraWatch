@@ -5,6 +5,7 @@ Renders real-time anomaly log, incident root-cause analysis, and recommended cor
 
 import streamlit as st
 import pandas as pd
+import textwrap
 
 
 def render_alert_panel(latest_data, df_history: pd.DataFrame, gemini_api_key=None):
@@ -30,20 +31,20 @@ def render_alert_panel(latest_data, df_history: pd.DataFrame, gemini_api_key=Non
         banner_color = "#ef4444"
         banner_title = "SYSTEM STATUS: CRITICAL FAILURE IMMINENT"
 
-    st.markdown(f"""
-    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid {banner_color}66; border-left: 6px solid {banner_color}; border-radius: 10px; padding: 16px; margin-bottom: 20px;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 1.05rem; font-weight: 700; color: {banner_color};">{banner_title}</div>
-            <div style="font-size: 0.85rem; color: #94a3b8;">Estimated Remaining Useful Life: <b style="color: #f8fafc;">{rul_hours} Hours</b></div>
-        </div>
-        <div style="margin-top: 10px; font-size: 0.95rem; color: #e2e8f0;">
-            <b>Root Cause Investigation:</b> {root_cause}
-        </div>
-        <div style="margin-top: 6px; font-size: 0.95rem; color: #cbd5e1;">
-            <b>Prescriptive Action:</b> {recommendation}
-        </div>
+    st.markdown(textwrap.dedent(f"""
+<div style="background: rgba(15, 23, 42, 0.7); border: 1px solid {banner_color}66; border-left: 6px solid {banner_color}; border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 1.05rem; font-weight: 700; color: {banner_color};">{banner_title}</div>
+        <div style="font-size: 0.85rem; color: #94a3b8;">Estimated Remaining Useful Life: <b style="color: #f8fafc;">{rul_hours} Hours</b></div>
     </div>
-    """, unsafe_allow_html=True)
+    <div style="margin-top: 10px; font-size: 0.95rem; color: #e2e8f0;">
+        <b>Root Cause Investigation:</b> {root_cause}
+    </div>
+    <div style="margin-top: 6px; font-size: 0.95rem; color: #cbd5e1;">
+        <b>Prescriptive Action:</b> {recommendation}
+    </div>
+</div>
+"""), unsafe_allow_html=True)
 
     col1, col2 = st.columns([1.2, 1])
 

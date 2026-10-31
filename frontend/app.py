@@ -9,6 +9,7 @@ import time
 import pandas as pd
 import sys
 import os
+import textwrap
 
 # Add repository root to path
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -90,15 +91,15 @@ if "inject_spike" not in st.session_state:
 
 # 4. Sidebar Controls
 with st.sidebar:
-    st.markdown("""
-    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-        <div style="font-size: 2rem;">⚙️</div>
-        <div>
-            <div style="font-size: 1.3rem; font-weight: 800; color: #38bdf8; letter-spacing: -0.02em;">InfraWatch</div>
-            <div style="font-size: 0.75rem; color: #94a3b8;">Predictive Failure Intelligence</div>
-        </div>
+    st.markdown(textwrap.dedent("""
+<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+    <div style="font-size: 2rem;">⚙️</div>
+    <div>
+        <div style="font-size: 1.3rem; font-weight: 800; color: #38bdf8; letter-spacing: -0.02em;">InfraWatch</div>
+        <div style="font-size: 0.75rem; color: #94a3b8;">Predictive Failure Intelligence</div>
     </div>
-    """, unsafe_allow_html=True)
+</div>
+"""), unsafe_allow_html=True)
 
     st.caption("🏆 Hacktoberfest Hack Day × CC Club MNNIT (Track 1: Applied AI)")
     st.divider()
@@ -134,12 +135,12 @@ with st.sidebar:
     st.divider()
     st.subheader("📋 Asset Specifications")
     st.markdown("""
-    * **Equipment:** Multi-Stage Centrifugal Pump
-    * **Model:** Grundfos CRN 32-4
-    * **Tag ID:** `PUMP-402A`
-    * **Speed:** 2,950 RPM (49.2 Hz)
-    * **ISO Standard:** ISO 10816-3 (Class II)
-    * **Backend Engine:** %s
+* **Equipment:** Multi-Stage Centrifugal Pump
+* **Model:** Grundfos CRN 32-4
+* **Tag ID:** `PUMP-402A`
+* **Speed:** 2,950 RPM (49.2 Hz)
+* **ISO Standard:** ISO 10816-3 (Class II)
+* **Backend Engine:** %s
     """ % ("🟢 Connected (Aditya's ML Engine)" if BACKEND_AVAILABLE else "🟡 Standalone High-Fidelity Simulator"))
 
 # 5. Telemetry Ingestion Step
@@ -160,7 +161,7 @@ latest_pt = st.session_state.history.iloc[-1].to_dict() if not st.session_state.
 status_color = "#10b981" if latest_pt.get("risk_level") == "NORMAL" else ("#f59e0b" if latest_pt.get("risk_level") in ["LOW_RISK", "WARNING"] else "#ef4444")
 stream_badge = "🟢 STREAMING ACTIVE" if st.session_state.streaming else "⏸ STREAM PAUSED"
 
-st.markdown(f"""
+st.markdown(textwrap.dedent(f"""
 <div class="header-box">
     <div>
         <div style="font-size: 1.35rem; font-weight: 800; color: #f8fafc; letter-spacing: -0.02em;">
@@ -179,7 +180,7 @@ st.markdown(f"""
         </span>
     </div>
 </div>
-""", unsafe_allow_html=True)
+"""), unsafe_allow_html=True)
 
 # 7. Render KPI Metric Cards
 render_sensor_cards(latest_pt)
@@ -193,7 +194,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 with tab1:
-    # 2D Digital Twin Schematic
+    # 2D Digital Twin Schematic (rendered cleanly via components.html)
     render_digital_twin_view(latest_pt)
     
     # Real-Time Plotly Charts
