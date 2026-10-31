@@ -1,17 +1,17 @@
 """
 Digital Twin Schematic Component for InfraWatch Dashboard.
-Renders an interactive, SVG-based asset view of the industrial water pump
-with color-coded component health indicators (NDE Bearing, DE Bearing, Motor, Impeller, Seal).
+Renders an animated SVG asset view with spinning shaft/impeller when running,
+pulsing emergency beacon on degrading subsystems, and an interactive drill-down inspector.
 """
 
 import streamlit as st
 import streamlit.components.v1 as components
 
 
-def render_digital_twin_view(latest_data):
+def render_digital_twin_view(latest_data, is_running=False, selected_subsystem="NDE Bearing"):
     """
-    Renders 2D asset schematic with live component health statuses.
-    Uses components.html to ensure 100% reliable SVG rendering without markdown escaping.
+    Renders 2D animated asset schematic with live component health statuses
+    and an interactive subsystem X-Ray inspection panel.
     """
     comp_health = latest_data.get("comp_health", {
         "motor": "HEALTHY",
@@ -20,6 +20,7 @@ def render_digital_twin_view(latest_data):
         "impeller": "HEALTHY",
         "seal": "HEALTHY"
     })
+    subsystem_specs = latest_data.get("subsystem_specs", {})
 
     def get_status_props(status):
         if status == "HEALTHY":
@@ -37,7 +38,14 @@ def render_digital_twin_view(latest_data):
     imp_col, imp_bg, imp_txt = get_status_props(comp_health.get("impeller", "HEALTHY"))
     seal_col, seal_bg, seal_txt = get_status_props(comp_health.get("seal", "HEALTHY"))
 
-    # Pure HTML/SVG block for iframe rendering
+    # Animation CSS triggers
+    shaft_anim = "animation: rotateShaft 0.6s linear infinite;" if is_running else ""
+    impeller_anim = "animation: spinImpeller 0.8s linear infinite; transform-origin: 520px 83px;" if is_running else ""
+    
+    # Pulsing beacon for faulty bearing or impeller
+    nde_pulse = "animation: pulseBeacon 1s ease-in-out infinite;" if comp_health.get("nde_bearing") != "HEALTHY" else ""
+    imp_pulse = "animation: pulseBeacon 1s ease-in-out infinite;" if comp_health.get("impeller") != "HEALTHY" else ""
+
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -54,23 +62,23 @@ def render_digital_twin_view(latest_data):
                 background: rgba(15, 23, 42, 0.85);
                 border: 1px solid rgba(255,255,255,0.1);
                 border-radius: 12px;
-                padding: 18px;
+                padding: 16px 20px;
                 box-sizing: border-box;
             }}
             .header-row {{
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                margin-bottom: 12px;
+                margin-bottom: 10px;
             }}
             .title {{
-                font-size: 1rem;
+                font-size: 0.95rem;
                 font-weight: 700;
                 color: #f8fafc;
                 letter-spacing: 0.03em;
             }}
             .asset-id {{
-                font-size: 0.8rem;
+                font-size: 0.78rem;
                 color: #94a3b8;
                 margin-left: 8px;
             }}
@@ -87,13 +95,13 @@ def render_digital_twin_view(latest_data):
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                padding: 10px 0;
+                padding: 8px 0;
             }}
             .grid-badges {{
                 display: grid;
                 grid-template-columns: repeat(5, 1fr);
                 gap: 8px;
-                margin-top: 10px;
+                margin-top: 8px;
             }}
             .badge-card {{
                 border-radius: 6px;
@@ -109,6 +117,20 @@ def render_digital_twin_view(latest_data):
                 font-weight: 700;
                 margin-top: 2px;
             }}
+
+            @keyframes rotateShaft {{
+                0% {{ stroke-dashoffset: 0; }}
+                100% {{ stroke-dashoffset: 24; }}
+            }}
+            @keyframes spinImpeller {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+            @keyframes pulseBeacon {{
+                0% {{ r: 6px; opacity: 0.4; filter: drop-shadow(0 0 2px #ef4444); }}
+                50% {{ r: 10px; opacity: 1; filter: drop-shadow(0 0 8px #ef4444); }}
+                100% {{ r: 6px; opacity: 0.4; filter: drop-shadow(0 0 2px #ef4444); }}
+            }}
         </style>
     </head>
     <body>
@@ -118,7 +140,10 @@ def render_digital_twin_view(latest_data):
                     <span class="title">ASSET DIGITAL TWIN — SUBSYSTEM STATUS</span>
                     <span class="asset-id">ID: PUMP-402A (Grundfos CRN 32-4)</span>
                 </div>
-                <span class="badge-online">● 5 SENSOR NODES ACTIVE</span>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <span style="font-size: 0.72rem; color: #94a3b8;">{'🌀 ROTATING @ ' + str(latest_data.get('rpm', 2950)) + ' RPM' if is_running else '⏸ STANDSTILL'}</span>
+                    <span class="badge-online">● 5 SENSOR NODES ACTIVE</span>
+                </div>
             </div>
 
             <div class="svg-wrap">
@@ -151,14 +176,14 @@ def render_digital_twin_view(latest_data):
 
                     <!-- 2. Non-Drive End (NDE) Bearing Housing -->
                     <rect x="35" y="60" width="30" height="46" rx="4" fill="#0f172a" stroke="{nde_col}" stroke-width="2.5"/>
-                    <circle cx="50" cy="83" r="7" fill="{nde_col}"/>
+                    <circle cx="50" cy="83" r="7" fill="{nde_col}" style="{nde_pulse}"/>
 
                     <!-- 3. Drive End (DE) Bearing Housing -->
                     <rect x="255" y="60" width="30" height="46" rx="4" fill="#0f172a" stroke="{de_col}" stroke-width="2.5"/>
                     <circle cx="270" cy="83" r="7" fill="{de_col}"/>
 
-                    <!-- Flexible Coupling -->
-                    <rect x="300" y="66" width="35" height="34" rx="3" fill="#334155" stroke="#64748b" stroke-dasharray="4"/>
+                    <!-- Flexible Coupling with rotation effect -->
+                    <rect x="300" y="66" width="35" height="34" rx="3" fill="#334155" stroke="#38bdf8" stroke-dasharray="6,4" stroke-width="2" style="{shaft_anim}"/>
                     <text x="317" y="55" fill="#94a3b8" font-size="10" text-anchor="middle">Coupling</text>
 
                     <!-- 4. Mechanical Seal Chamber -->
@@ -167,9 +192,15 @@ def render_digital_twin_view(latest_data):
 
                     <!-- 5. Multi-Stage Impeller Volute Casing -->
                     <path d="M 410,35 L 610,35 L 630,70 L 630,96 L 610,131 L 410,131 Z" fill="url(#bodyGrad)" stroke="{imp_col}" stroke-width="2.5"/>
-                    <circle cx="520" cy="83" r="30" fill="none" stroke="#475569" stroke-width="2" stroke-dasharray="6,4"/>
-                    <circle cx="520" cy="83" r="10" fill="{imp_col}"/>
-                    <text x="520" y="88" fill="#e2e8f0" font-size="12" font-weight="bold" text-anchor="middle">IMPELLER</text>
+                    
+                    <!-- Spinning Impeller Vanes Group -->
+                    <g style="{impeller_anim}">
+                        <circle cx="520" cy="83" r="30" fill="none" stroke="#475569" stroke-width="2" stroke-dasharray="6,4"/>
+                        <line x1="520" y1="55" x2="520" y2="111" stroke="#38bdf8" stroke-width="1.5"/>
+                        <line x1="492" y1="83" x2="548" y2="83" stroke="#38bdf8" stroke-width="1.5"/>
+                    </g>
+                    <circle cx="520" cy="83" r="8" fill="{imp_col}" style="{imp_pulse}"/>
+                    <text x="520" y="118" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">IMPELLER</text>
 
                     <!-- Discharge Flange (Outflow) -->
                     <rect x="485" y="5" width="40" height="30" fill="url(#pipeGrad)" stroke="#64748b" stroke-width="1.5"/>
@@ -220,3 +251,54 @@ def render_digital_twin_view(latest_data):
     </html>
     """
     components.html(html_content, height=295, scrolling=False)
+
+    # Subsystem Drill-Down X-Ray Inspector
+    st.markdown("#### 🔍 Subsystem Deep Diagnostic Inspector")
+    sub_key_map = {
+        "NDE Bearing": "nde_bearing",
+        "DE Bearing": "de_bearing",
+        "Motor Stator": "motor",
+        "Impeller Volute": "impeller",
+        "Mechanical Seal": "seal"
+    }
+    
+    sub_choice = st.pills(
+        "Select Subsystem to Inspect",
+        options=["NDE Bearing", "DE Bearing", "Motor Stator", "Impeller Volute", "Mechanical Seal"],
+        default=selected_subsystem
+    )
+    
+    active_key = sub_key_map.get(sub_choice, "nde_bearing")
+    specs = subsystem_specs.get(active_key, {})
+    status = comp_health.get(active_key, "HEALTHY")
+    status_col, _, _ = get_status_props(status)
+
+    col1, col2, col3 = st.columns([1.2, 1.2, 1.5])
+    with col1:
+        st.markdown(f"**Hardware Specification:** `{specs.get('model', 'Standard Component')}`")
+        if "lubricant_health" in specs:
+            st.markdown(f"**Lubrication Quality:** `{specs.get('lubricant_health')}`")
+        elif "winding_temp" in specs:
+            st.markdown(f"**Winding Thermal Index:** `{specs.get('winding_temp')}`")
+        elif "npsh_available" in specs:
+            st.markdown(f"**NPSH Margin:** `{specs.get('npsh_available')}`")
+        elif "barrier_pressure" in specs:
+            st.markdown(f"**Barrier Fluid Pressure:** `{specs.get('barrier_pressure')}`")
+            
+    with col2:
+        if "clearance_mm" in specs:
+            st.markdown(f"**Radial Clearance:** `{specs.get('clearance_mm')}`")
+            st.markdown(f"**Vibration Envelope:** `{specs.get('vibration_envelope_g')}`")
+        elif "phase_current" in specs:
+            st.markdown(f"**Current Draw:** `{specs.get('phase_current')}`")
+            st.markdown(f"**Motor Efficiency:** `{specs.get('efficiency')}`")
+        elif "cavitation_risk_index" in specs:
+            st.markdown(f"**Cavitation Risk:** `{specs.get('cavitation_risk_index')}`")
+            st.markdown(f"**Volute Pressure:** `{specs.get('volute_pressure')}`")
+        elif "leakage_rate" in specs:
+            st.markdown(f"**Seal Leakage Rate:** `{specs.get('leakage_rate')}`")
+            st.markdown(f"**Face Temperature:** `{specs.get('face_temp')}`")
+
+    with col3:
+        st.markdown(f"**Subsystem Status:** <span style='color:{status_col}; font-weight:bold;'>{status}</span>", unsafe_allow_html=True)
+        st.info(f"💡 **Recommended Action:** {specs.get('recommended_action', 'Continue normal monitoring.')}")

@@ -1,6 +1,6 @@
 """
 Diagnostics & Frequency Spectrum Component for InfraWatch Dashboard.
-Renders FFT vibration harmonic analysis (1X, 2X, BPFO, BPFI) and sensor correlation heatmap.
+Renders FFT vibration harmonic analysis dynamically linked to RPM speed and sensor correlation heatmap.
 """
 
 import streamlit as st
@@ -9,18 +9,17 @@ import numpy as np
 import pandas as pd
 
 
-def render_fft_spectrum(scenario="Normal Operation", vibration_level=2.4):
+def render_fft_spectrum(scenario="Normal Operation", vibration_level=2.4, rpm=2950):
     """
-    Simulates and visualizes the vibration frequency spectrum (FFT).
+    Simulates and visualizes the vibration frequency spectrum (FFT) dynamically based on RPM.
     Highlights 1X (shaft speed), 2X, BPFO (outer race fault), and BPFI (inner race fault).
     """
     frequencies = np.linspace(0, 500, 300)
     
-    # 1X Running speed (2950 RPM ≈ 49.2 Hz)
-    base_1x = 49.2
-    # Harmonics and fault frequencies
-    bpfo = 107.5  # Ball Pass Frequency Outer Race (typically ~2.2x to 3.5x shaft speed)
-    bpfi = 162.8  # Ball Pass Frequency Inner Race (typically ~4.5x shaft speed)
+    # Dynamic 1X Running speed based on user-selected RPM
+    base_1x = round(float(rpm) / 60.0, 1)  # e.g., 2950 RPM ≈ 49.2 Hz; 1800 RPM = 30 Hz
+    bpfo = round(base_1x * 2.18, 1)       # Ball Pass Frequency Outer Race
+    bpfi = round(base_1x * 3.31, 1)       # Ball Pass Frequency Inner Race
 
     # Base noise floor
     amplitude = np.random.normal(0.08, 0.02, size=len(frequencies))
@@ -59,22 +58,22 @@ def render_fft_spectrum(scenario="Normal Operation", vibration_level=2.4):
         hovertemplate="Freq: %{x:.1f} Hz<br>Amp: %{y:.3f} g RMS<extra></extra>"
     ))
 
-    # Annotate key harmonic markers
+    # Annotate key harmonic markers dynamically based on RPM
     annotations = [
-        dict(x=base_1x, y=amp_1x, text="1X (49.2 Hz)", showarrow=True, arrowhead=2, arrowcolor="#10b981", font=dict(color="#10b981", size=10)),
-        dict(x=base_1x * 2, y=amp_1x * 0.35, text="2X", showarrow=True, arrowhead=2, arrowcolor="#64748b", font=dict(color="#94a3b8", size=9))
+        dict(x=base_1x, y=amp_1x, text=f"1X ({base_1x} Hz)", showarrow=True, arrowhead=2, arrowcolor="#10b981", font=dict(color="#10b981", size=10)),
+        dict(x=base_1x * 2, y=amp_1x * 0.35, text=f"2X ({base_1x*2:.1f} Hz)", showarrow=True, arrowhead=2, arrowcolor="#64748b", font=dict(color="#94a3b8", size=9))
     ]
 
     if "Bearing" in scenario or vibration_level > 4.5:
         annotations.append(
-            dict(x=bpfo, y=max(amplitude), text="BPFO (107.5 Hz) FAULT", showarrow=True, arrowhead=2, arrowcolor="#ef4444", font=dict(color="#ef4444", size=11, family="monospace"))
+            dict(x=bpfo, y=max(amplitude), text=f"BPFO ({bpfo} Hz) FAULT", showarrow=True, arrowhead=2, arrowcolor="#ef4444", font=dict(color="#ef4444", size=11, family="monospace"))
         )
         annotations.append(
-            dict(x=bpfi, y=max(amplitude) * 0.7, text="BPFI (162.8 Hz)", showarrow=True, arrowhead=2, arrowcolor="#f59e0b", font=dict(color="#f59e0b", size=10))
+            dict(x=bpfi, y=max(amplitude) * 0.7, text=f"BPFI ({bpfi} Hz)", showarrow=True, arrowhead=2, arrowcolor="#f59e0b", font=dict(color="#f59e0b", size=10))
         )
 
     fig.update_layout(
-        title="FFT SPECTRUM — BEARING & HYDRAULIC FAULT FREQUENCY ANALYSIS",
+        title=f"FFT SPECTRUM — SPEED-SYNCHRONIZED HARMONIC ANALYSIS ({rpm} RPM)",
         title_font=dict(size=13, color="#f8fafc"),
         template="plotly_dark",
         paper_bgcolor="rgba(15, 23, 42, 0.4)",

@@ -17,6 +17,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from frontend.utils.backend_bridge import get_latest_telemetry, get_initial_history, BACKEND_AVAILABLE
+from frontend.utils.audio_synth import generate_pump_audio
 from frontend.components.sensor_cards import render_sensor_cards
 from frontend.components.charts import render_sensor_charts
 from frontend.components.digital_twin import render_digital_twin_view
@@ -104,7 +105,7 @@ with st.sidebar:
     st.caption("🏆 Hacktoberfest Hack Day × CC Club MNNIT (Track 1: Applied AI)")
     st.divider()
 
-    st.subheader("🎮 Simulation Control Panel")
+    st.subheader("🎮 Operational Scenarios")
 
     scenario = st.selectbox(
         "Operating Scenario",
@@ -130,22 +131,39 @@ with st.sidebar:
         st.session_state.history = get_initial_history(count=40, scenario=scenario)
         st.rerun()
 
+    # 4.1 Digital Twin Physics & Stress-Testing Sliders
+    with st.expander("🎛️ Digital Twin Physics Tuning", expanded=True):
+        rpm_val = st.slider("Pump Running Speed (RPM)", min_value=1800, max_value=3600, value=2950, step=50, help="Dynamically shifts running frequency and harmonic vibration.")
+        throttle_val = st.slider("Suction Valve Open (%)", min_value=25, max_value=100, value=100, step=5, help="Throttling suction below 65% triggers hydraulic cavitation.")
+        ambient_temp_val = st.slider("Ambient Temperature (°C)", min_value=15.0, max_value=50.0, value=28.0, step=1.0, help="Simulates plant room cooling conditions.")
+
+    # 4.2 ML Anomaly Sensitivity Tuning
+    with st.expander("🎚️ ML Anomaly Detection Sensitivity", expanded=False):
+        sensitivity_z = st.slider("Isolation Z-Threshold (σ)", min_value=1.5, max_value=3.5, value=2.5, step=0.1, help="Adjusts anomaly threshold sensitivity on multivariate telemetry.")
+
     refresh_rate = st.slider("Stream Refresh Interval (s)", min_value=1.0, max_value=5.0, value=2.0, step=0.5)
 
     st.divider()
     st.subheader("📋 Asset Specifications")
-    st.markdown("""
+    st.markdown(f"""
 * **Equipment:** Multi-Stage Centrifugal Pump
 * **Model:** Grundfos CRN 32-4
 * **Tag ID:** `PUMP-402A`
-* **Speed:** 2,950 RPM (49.2 Hz)
+* **Operating Speed:** {rpm_val} RPM ({rpm_val/60:.1f} Hz)
 * **ISO Standard:** ISO 10816-3 (Class II)
 * **Backend Engine:** %s
     """ % ("🟢 Connected (Aditya's ML Engine)" if BACKEND_AVAILABLE else "🟡 Standalone High-Fidelity Simulator"))
 
-# 5. Telemetry Ingestion Step
+# 5. Telemetry Ingestion Step with Physics Parameters
 if st.session_state.streaming or st.session_state.inject_spike:
-    new_pt = get_latest_telemetry(scenario=scenario, inject_spike=st.session_state.inject_spike)
+    new_pt = get_latest_telemetry(
+        scenario=scenario,
+        inject_spike=st.session_state.inject_spike,
+        rpm=rpm_val,
+        throttle=throttle_val,
+        ambient_temp=ambient_temp_val,
+        sensitivity_z=sensitivity_z
+    )
     st.session_state.inject_spike = False
     
     # Append to history dataframe
@@ -168,7 +186,7 @@ st.markdown(textwrap.dedent(f"""
             INDUSTRIAL PUMP DIGITAL TWIN — CONDITION MONITORING
         </div>
         <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 3px;">
-            Sector 4 Water Feed Station | Asset Tag: <span style="color: #38bdf8; font-weight: 600;">PUMP-402A</span> | Telemetry Timestamp: <span style="color: #f8fafc;">{latest_pt.get('timestamp', 'N/A')}</span>
+            Sector 4 Water Feed Station | Asset Tag: <span style="color: #38bdf8; font-weight: 600;">PUMP-402A</span> | Speed: <span style="color: #f8fafc;">{rpm_val} RPM</span> | Timestamp: <span style="color: #f8fafc;">{latest_pt.get('timestamp', 'N/A')}</span>
         </div>
     </div>
     <div style="display: flex; gap: 10px; align-items: center;">
@@ -186,16 +204,17 @@ st.markdown(textwrap.dedent(f"""
 render_sensor_cards(latest_pt)
 
 # 8. Main Tabs
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🛰️ Live Telemetry & Digital Twin",
     "🔬 Advanced FFT Spectrum & Correlations",
+    "🎧 Acoustic Machine Sonification",
     "📋 Incident Log & Prescriptive Actions",
     "🧠 Agentic Intelligence & Architecture"
 ])
 
 with tab1:
-    # 2D Digital Twin Schematic (rendered cleanly via components.html)
-    render_digital_twin_view(latest_pt)
+    # 2D Animated Digital Twin Schematic
+    render_digital_twin_view(latest_pt, is_running=st.session_state.streaming)
     
     # Real-Time Plotly Charts
     fig_charts = render_sensor_charts(st.session_state.history)
@@ -205,7 +224,7 @@ with tab1:
 with tab2:
     col_d1, col_d2 = st.columns([1.3, 1])
     with col_d1:
-        fig_fft = render_fft_spectrum(scenario=scenario, vibration_level=latest_pt.get("vibration", 2.4))
+        fig_fft = render_fft_spectrum(scenario=scenario, vibration_level=latest_pt.get("vibration", 2.4), rpm=rpm_val)
         st.plotly_chart(fig_fft, use_container_width=True)
     with col_d2:
         fig_corr = render_correlation_heatmap(st.session_state.history)
@@ -214,15 +233,40 @@ with tab2:
         else:
             st.info("Gathering sensor telemetry buffer for correlation matrix...")
 
-    st.markdown("""
+    st.markdown(f"""
     > [!NOTE]
-    > **Why Multivariate Spectral Analysis Matters:** Single-threshold alarms miss early bearing wear. InfraWatch isolates characteristic bearing defect harmonics (**BPFO @ 107.5 Hz**) well before overall vibration levels breach destructive ISO limits.
+    > **Speed-Coupled Dynamic Analysis:** Operating at **{rpm_val} RPM** places the primary 1X shaft harmonic at **{rpm_val/60.0:.1f} Hz** and outer-race defect frequency (BPFO) at **{(rpm_val/60.0)*2.18:.1f} Hz**. Tuning the RPM slider updates the spectral signature in real-time.
     """)
 
 with tab3:
-    render_alert_panel(latest_pt, st.session_state.history)
+    st.subheader("🎧 Acoustic Signature & Vibration Sonification")
+    st.markdown("""
+    Predictive maintenance vibration frequencies can be converted directly into the audible acoustic spectrum. 
+    **Listen to the physical condition of the pump below:**
+    """)
+    
+    col_snd1, col_snd2 = st.columns([1.2, 1.8])
+    with col_snd1:
+        st.markdown(f"**Current Scenario:** `{scenario}`")
+        st.markdown(f"**Operating Speed:** `{rpm_val} RPM`")
+        # Generate real-time audio
+        audio_bytes = generate_pump_audio(scenario=scenario, rpm=rpm_val)
+        st.audio(audio_bytes, format="audio/wav")
+    
+    with col_snd2:
+        if scenario == "Normal Operation":
+            st.success("🟢 **Normal Harmonic Signature:** Smooth continuous 50 Hz electromagnetic motor hum with low-amplitude aerodynamic blade pass frequencies.")
+        elif "Bearing" in scenario:
+            st.warning("🟡 **Bearing Raceways Impact Squeal:** Distinct high-frequency harmonic chirping (~1.4 kHz) caused by rolling elements striking raceway spalls.")
+        elif "Cavitation" in scenario:
+            st.error("🟠 **Hydraulic Cavitation Noise:** Broadband chaotic gravel rattling caused by rapid vapor bubble collapse against the stainless steel impeller.")
+        else:
+            st.error("🔴 **Multi-Fault Dissonance:** High-amplitude unbalance hum coupled with severe mechanical friction chatter.")
 
 with tab4:
+    render_alert_panel(latest_pt, st.session_state.history)
+
+with tab5:
     st.subheader("🏗️ InfraWatch Intelligence Architecture")
     st.markdown("""
     InfraWatch operates as a multi-stage predictive agent pipeline:

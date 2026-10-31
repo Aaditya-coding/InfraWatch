@@ -1,22 +1,24 @@
 """
 Alerts & Prescriptive Maintenance Component for InfraWatch Dashboard.
-Renders real-time anomaly log, incident root-cause analysis, and recommended corrective actions.
+Renders real-time anomaly log, incident root-cause analysis, and one-click SCADA work order export.
 """
 
 import streamlit as st
 import pandas as pd
 import textwrap
+from datetime import datetime
 
 
 def render_alert_panel(latest_data, df_history: pd.DataFrame, gemini_api_key=None):
     """
-    Renders incident diagnostics and maintenance action recommendations.
+    Renders incident diagnostics, maintenance action recommendations, and one-click data export.
     """
     risk_level = latest_data.get("risk_level", "NORMAL")
     root_cause = latest_data.get("root_cause", "All parameters nominal.")
     recommendation = latest_data.get("recommendation", "Continue standard operating cycle.")
     rul_hours = latest_data.get("rul_hours", 720)
     health = latest_data.get("risk_score", 95)
+    timestamp = latest_data.get("timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     if risk_level == "NORMAL":
         banner_color = "#10b981"
@@ -64,6 +66,50 @@ def render_alert_panel(latest_data, df_history: pd.DataFrame, gemini_api_key=Non
                 st.info("No abnormal sensor events recorded in current telemetry buffer.")
         else:
             st.info("Waiting for telemetry stream...")
+
+        # One-Click Export Buttons
+        st.markdown("#### 📥 SCADA Data & Report Export")
+        exp_col1, exp_col2 = st.columns(2)
+        with exp_col1:
+            if df_history is not None and not df_history.empty:
+                csv_data = df_history.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📊 Download Telemetry (CSV)",
+                    data=csv_data,
+                    file_name=f"InfraWatch_telemetry_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+        with exp_col2:
+            ticket_md = f"""# INFRAWATCH SCADA WORK ORDER TICKET
+**Asset ID:** PUMP-402A (Grundfos CRN 32-4 Multi-Stage Feed Pump)
+**Timestamp:** {timestamp}
+**Overall Health Score:** {health}%
+**Current Severity:** {risk_level}
+**Remaining Useful Life (RUL):** {rul_hours} hours
+
+## INCIDENT DIAGNOSTIC SUMMARY
+- **Root Cause Analysis:** {root_cause}
+- **Prescriptive Maintenance Action:** {recommendation}
+
+## TELEMETRY SNAPSHOT
+- Vibration RMS: {latest_data.get('vibration')} mm/s
+- Bearing Temperature: {latest_data.get('temperature')} °C
+- Discharge Pressure: {latest_data.get('pressure')} bar
+- Motor Active Power: {latest_data.get('power')} kW
+
+## DISPATCH CHECKLIST
+- [ ] Technician Sign-off: __________________
+- [ ] Work Order ID: WO-{int(datetime.now().timestamp())}
+- [ ] Safe Lock-Out / Tag-Out (LOTO) Verified
+"""
+            st.download_button(
+                label="📄 Export Work Order (Markdown)",
+                data=ticket_md.encode('utf-8'),
+                file_name=f"WorkOrder_PUMP402A_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
+                mime="text/markdown",
+                use_container_width=True
+            )
 
     with col2:
         st.subheader("🛠️ Maintenance Task Checklist")
